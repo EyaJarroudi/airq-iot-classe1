@@ -4,8 +4,7 @@ Chaîne IoT 100 % simulée : ESP32 (Wokwi) + simulateur Python, MQTT, SQLite, Gr
 
 ## Lien Wokwi
 
-[](https://wokwi.com/projects/481303302134062081)
-
+[(https://wokwi.com/projects/481303302134062081)]
 ## Lancement
 
 1. `python -m venv venv` puis `venv\Scripts\activate`
