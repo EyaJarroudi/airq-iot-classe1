@@ -45,6 +45,28 @@ def commande_etat():
         texte += f"{icone(co2)} {room} : {co2:.0f} ppm, {temp:.1f} °C, {hum:.0f} %\n"
     return texte
 
+def commande_salle(nom):
+    """Détail d'une salle : dernière mesure + ancienneté."""
+    con = sqlite3.connect(f"file:{DB}?mode=ro", uri=True)
+    ligne = con.execute(
+        "SELECT co2, temp, hum, ts_epoch FROM mesures "
+        "WHERE room = ? ORDER BY id DESC LIMIT 1", (nom,)).fetchone()
+    con.close()
+    if ligne is None:
+        return (f"Salle inconnue : {nom}\n"
+                "Essayez /etat pour voir les salles disponibles.")
+    co2, temp, hum, ts = ligne
+    if ts > 1e11:
+        ts = ts / 1000
+    age = time.time() - ts
+    texte = (f"{icone(co2)} {nom}\n"
+             f"CO₂ : {co2:.0f} ppm\n"
+             f"Température : {temp:.1f} °C\n"
+             f"Humidité : {hum:.0f} %\n"
+             f"Dernière mesure : il y a {age:.0f} s")
+    if age > 30:
+        texte += "\n⚠️ Cette salle semble muette."
+    return texte
 
 def main():
     print("Bot démarré (Ctrl+C pour arrêter)")
@@ -60,8 +82,12 @@ def main():
                 msg = upd.get("message")
                 if not msg or str(msg["chat"]["id"]) != CHAT_ID:
                     continue  # on ignore les autres personnes
-                if msg.get("text", "").strip().lower().startswith("/etat"):
+                texte_recu = msg.get("text", "").strip().lower()
+                if texte_recu.startswith("/etat"):
                     envoyer(commande_etat())
+                elif texte_recu.startswith("/salle"):
+                    nom = texte_recu[1:].split("@")[0].split()[0]
+                    envoyer(commande_salle(nom))
         except requests.RequestException as e:
             print("Erreur réseau :", e)
             time.sleep(5)
