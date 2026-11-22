@@ -24,7 +24,7 @@ G = 0.005             # L/s par personne
 
 # ---------- Emploi du temps ----------
 # (début, fin) en heures décimales : cours, avec pause midi
-LESSONS = [(8.30, 10), (10.30, 11.45), (13, 14.30), (14.45, 16.15)]
+LESSONS = [(8.5, 10), (10.5, 11.75), (13, 14.5), (14.75, 16.25)]
 
 
 def in_lesson(hour: float, planning) -> bool:
@@ -32,6 +32,8 @@ def in_lesson(hour: float, planning) -> bool:
 
 
 # ---------- Modèle d'une salle ----------
+# On définit une classe Room qui représente une salle de classe avec ses caractéristiques et son état.
+# Elle contient des méthodes pour mettre à jour l'état de la salle en fonction du temps simulé et pour mesurer les paramètres environnementaux (CO₂, température, humidité) avec un bruit aléatoire pour simuler des capteurs réels.
 @dataclass
 class Room:
     name: str
@@ -50,7 +52,7 @@ class Room:
         """Avance la salle de dt secondes simulées."""
         hour = sim_time.hour + sim_time.minute / 60 + sim_time.second / 3600
 
-        # Occupation : présents pendant les cours, 0 sinon
+        #Véerfie si l'heure est celle du cours ou non si oui le nombre d'occupants est aléatoire entre 60% et 100% de la capacité sinon il est à 0
         if in_lesson(hour, self.planning):
             if self.occupants == 0:
                 self.occupants = random.randint(int(self.capacity * 0.6), self.capacity)
@@ -81,7 +83,8 @@ class Room:
         # Humidité : l'occupation humidifie
         h_target = 42.0 + 0.5 * self.occupants - (4.0 if window_open else 0.0)
         self.hum += (h_target - self.hum) * min(1.0, dt / 900)
-
+#Cette méthode génère les mesures qui ressemblent a celle de vrais capteurs.
+#Elle ajoute un petit bruit aléatoire pour rendre les valeurs moins parfaites.
     def measure(self) -> dict:
         """Mesure bruitée, comme un vrai capteur."""
         return {
@@ -93,6 +96,7 @@ class Room:
 
 
 # ---------- Programme principal ----------
+#Création des quatre salles.
 def main():
     rooms = [
         Room("salle02", volume=150, capacity=30, ventilation_habit=0.9),
@@ -100,7 +104,8 @@ def main():
         Room("salle04", volume=200, capacity=40, ventilation_habit=0.6),
         Room("salle05", volume=90, capacity=20, ventilation_habit=0.0),  # jamais aérée
     ]
-
+    #Transmission MQTT : on se connecte au broker et on publie les mesures toutes les 5 minutes simulées.
+    #Cette partie établit une connexion avec le broker MQTT HiveMQ. 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2,
                          client_id=f"sim-{random.randint(0, 99999)}")
     client.connect(BROKER, PORT)
@@ -119,6 +124,8 @@ def main():
             for r in rooms:
                 payload = r.measure()
                 payload["ts"] = sim_time.isoformat()
+                #Chaque salle publie ses mesures sur un topic différent.
+                #Exemple : airq-votrenom-2026/salle02/mesures
                 topic = f"{PREFIX}/{r.name}/mesures"
                 client.publish(topic, json.dumps(payload))
                 print(f"{sim_time:%H:%M} {topic} {payload}")
